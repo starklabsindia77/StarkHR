@@ -1,6 +1,7 @@
 import { models, sequelize } from '../models/index.js';
 import { slugify } from '../utils/helpers.js';
 import logger from '../utils/logger.js';
+import cloudinary from '../services/cloudinary.js';
 
 export const createOrganization = async (req, res) => {
   const t = await sequelize.transaction();
@@ -17,6 +18,16 @@ export const createOrganization = async (req, res) => {
       return res.status(409).json({ message: 'Organization already exists' });
     }
 
+    // Upload logo to Cloudinary if provided
+    let logoUrl = null;
+    if (req.files && req.files.logo) {
+      const uploadedLogo = await cloudinary.uploader.upload(req.files.logo.tempFilePath, {
+        folder: 'organization_logos'
+      });
+      logoUrl = uploadedLogo.secure_url;
+    }
+
+
     const slug = slugify(name).replace(/-/g, '_');
     const subdomain = `${slug}.${req.get('host')}`;
     const schemaName = `org_${slug}`;
@@ -26,6 +37,7 @@ export const createOrganization = async (req, res) => {
         name,
         slug,
         subdomain,
+        logoUrl,
         settings: {
           industry,
           size,
@@ -142,20 +154,35 @@ export const deleteOrganization = async (req, res) => {
 export const getOrganizationBySubdomain = async (req, res) => {
   try {
     // const subdomain = req.hostname.split('.')[0]; // Extract subdomain from the hostname
-
+    console.log('test api');
     const { subdomain } = req.params;
 
     if (!subdomain) {
       return res.status(400).json({ message: 'Subdomain is required' });
     }
+    console.log('subdomain', subdomain);
+    let slug = subdomain.split('.')[0];
+    console.log('slug', slug);
 
-    const organization = await models.Organization.findOne({ where: { subdomain } });
+    const organization = await models.Organization.findOne({ where: { slug: slug } });
 
     if (!organization) {
       return res.status(404).json({ message: 'Organization not found' });
     }
 
-    res.status(200).json(organization);
+    const orgToken = jwt.sign(
+      { organizationId: organization.id },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    res.status(200).json({
+      message: 'Organization found',
+      organization: {
+        logoUrl: organization.logoUrl,
+      },
+      orgToken, // Token to be used for login only
+    });
   } catch (error) {
     logger.error('Error fetching organization by subdomain:', error);
     res.status(500).json({ message: 'Failed to fetch organization' });

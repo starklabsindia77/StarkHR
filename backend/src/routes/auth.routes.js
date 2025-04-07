@@ -2,6 +2,8 @@ import express from 'express';
 import { body } from 'express-validator';
 import * as authController from '../controllers/auth.controller.js';
 import { validate } from '../middleware/validation.js';
+import { upload } from '../middleware/upload.js';
+
 
 const router = express.Router();
 
@@ -35,6 +37,13 @@ const registerValidation = [
   body('updates').optional().isBoolean()
 ];
 
-router.post('/register', registerValidation, authController.register);
+const loginValidation = [
+  body('email').isEmail().withMessage('Invalid email address'),
+  body('password').notEmpty().withMessage('Password is required'),
+];
+
+
+router.post('/login', loginValidation, validate, authController.login);
+router.post('/register', upload.single('logo'), registerValidation, authController.register);
 
 export default router;

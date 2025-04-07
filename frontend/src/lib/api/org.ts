@@ -14,7 +14,7 @@ const API_BASE_URL = '/api/organizations';
  */
 export const fetchOrganizationBySubdomain = async (subdomain: string): Promise<Organization> => {
     try {
-      const response = await axios.get(`${API_URL}/${API_BASE_URL}/subdomain/${subdomain}`);
+      const response = await axios.get(`${API_URL}${API_BASE_URL}/subdomain/${subdomain}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching organization by subdomain:', error);

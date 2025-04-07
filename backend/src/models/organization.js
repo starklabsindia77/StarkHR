@@ -22,6 +22,10 @@ export class Organization extends Model {
         allowNull: true,
         unique: true,
       },
+      logoUrl: {
+        type: DataTypes.STRING,
+        allowNull: true, // New field for storing the logo URL
+      },
       settings: {
         type: DataTypes.JSONB,
         defaultValue: {}

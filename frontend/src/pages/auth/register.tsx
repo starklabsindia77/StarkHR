@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/rules-of-hooks */
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -17,6 +18,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Calendar, Building2, Mail, MapPin, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { RegisterData } from "@/lib/api/auth";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 const personalInfoSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -77,6 +80,11 @@ export default function RegisterPage() {
     verificationForm: {} as z.infer<typeof verificationSchema>,
   });
 
+  const navigate = useNavigate();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [subdomainUrl, setSubdomainUrl] = useState<string | null>(null);
+
 
   const options = [
     { num: 1, title: "Personal Info" },
@@ -135,17 +143,25 @@ export default function RegisterPage() {
         ...registerData.organizationForm,
         ...registerData.addressForm,
         ...data,
-        password: "demo",
+        password: "demo@1234",
         subscriptionPlan: "free",
       };
       console.log("Final Registration Data:", finalData);
 
       // Call the register function with final data
-      await registerUser(finalData);
-      toast({
-        title: "Success",
-        description: "Registration successful! You can now login.",
-      });
+      const response = await registerUser(finalData);
+      console.log('Registration Response:', response);
+      // if (response && response.organization) {
+      //   const orgUrl: string = `https://${response.organization.subdomain as string}`;
+      //   setSubdomainUrl(orgUrl);
+      //   setIsModalOpen(true);
+      
+      //   toast({
+      //     title: "Success",
+      //     description: "Registration successful! Redirecting to your dashboard...",
+      //   });
+      // }
+      
     } catch (error) {
       console.log("Error registering:", error);
       toast({
@@ -632,6 +648,23 @@ export default function RegisterPage() {
             </>
           )}
         </div>
+
+        {/* Success Modal */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent>
+            <DialogTitle>Registration Successful 🎉</DialogTitle>
+            <p className="text-center text-gray-600">Your organization has been registered successfully.</p>
+            <p className="text-center font-semibold">{subdomainUrl}</p>
+            <div className="flex justify-center">
+              <Button
+                className="mt-4"
+                onClick={() => navigate(subdomainUrl || "/")}
+              >
+                Go to Dashboard
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AuthLayout>
   );

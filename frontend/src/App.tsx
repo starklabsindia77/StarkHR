@@ -61,7 +61,10 @@ import ProfilePage from '@/pages/profile'
 import SettingsPage from '@/pages/settings'
 
 function AppRoutes() {
-  const { user } = useAuth()
+  const { user } = useAuth();
+
+  const hostname = window.location.hostname;
+  const isSubdomain = hostname.split(".").length >= 2;
 
 
   const SubdomainRouter = () => {
@@ -76,7 +79,17 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<HomePage />} />
+      {/* <Route path="/" element={<HomePage />} /> */}
+      <Route
+        path="/"
+        element={
+          isSubdomain ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <HomePage />
+          )
+        }
+      />
       <Route
         path="/login"
         element={

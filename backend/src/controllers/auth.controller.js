@@ -4,6 +4,7 @@ import { models, sequelize } from '../models/index.js';
 import { slugify } from '../utils/helpers.js';
 import emailService from '../services/email.service.js';
 import logger from '../utils/logger.js';
+import cloudinary from '../services/cloudinary.js';
 
 
 // Helper function to generate unique slug
@@ -69,6 +70,15 @@ export const register = async (req, res) => {
       where: { code: 'free' }
     });
 
+
+    let logoUrl = null;
+    if (req.files && req.files.logo) {
+      const uploadedLogo = await cloudinary.uploader.upload(req.files.logo.tempFilePath, {
+        folder: 'organization_logos'
+      });
+      logoUrl = uploadedLogo.secure_url;
+    }
+
     console.log('Creating organization...');
     let slug = await generateUniqueSlug(companyName);
     slug = slug.replace(/-/g, '_');
@@ -81,6 +91,7 @@ export const register = async (req, res) => {
           name: companyName,
           slug,
           subdomain: subdomain,
+          logoUrl,
           settings: {
             industry,
             size,
@@ -172,11 +183,80 @@ export const register = async (req, res) => {
     console.log('Registration successful!');
     res.status(201).json({
       message: 'api success',
+      url: `${subdomain}/login`,
     });
   } catch (error) {
     await t.rollback();
     console.error('Registration error:', error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const orgToken = req.headers['x-org-token']; // Read orgToken from headers
+
+    if (!email || !password || !orgToken) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Verify and extract organization ID from orgToken
+    let decoded;
+    try {
+      decoded = jwt.verify(orgToken, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired organization token' });
+    }
+
+    const { organizationId } = decoded;
+
+    // Fetch the organization
+    const organization = await models.Organization.findByPk(organizationId);
+    if (!organization) {
+      return res.status(404).json({ message: 'Organization not found' });
+    }
+
+    // Set organization schema
+    const schemaName = `org_${organization.slug}`;
+
+    // Access the User model within the organization schema
+    const UserModel = sequelize.models.User.schema(schemaName);
+
+    // Find the user in the organization's schema
+    const user = await UserModel.findOne({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Generate user token for authentication
+    const userToken = jwt.sign(
+      { userId: user.id, role: user.role, organizationId },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.status(200).json({
+      message: 'Login successful',
+      token: userToken,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        organizationId
+      }
+    });
+  } catch (error) {
+    logger.error('Login error:', error);
+    res.status(500).json({ message: 'Login failed', error: error.message });
   }
 };
 
